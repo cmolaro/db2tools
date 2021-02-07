@@ -23,4 +23,5 @@ git status   # will check the status of the repo. Without the fetch first, you w
 
 git status
 git add ./file.txt
+git rm ./file2.txt
 git commit
