@@ -8,8 +8,14 @@ git config --global user.email "cristian@molaro.be"
 git config --list
 
 # setup project folder
-sudo mkdir /work/db2tools
-chown cris /work/db2tools
+sudo mkdir /work
+chown cris /work
 su - cris
-cd /work/db2tools
+cd /work
 git init
+git clone https://github.com/cmolaro/db2tools
+
+mkdir ./scripts
+git add ./scripts
+git commit
+git push
