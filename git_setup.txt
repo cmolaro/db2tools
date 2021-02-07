@@ -15,7 +15,12 @@ cd /work
 git init
 git clone https://github.com/cmolaro/db2tools
 
-mkdir ./scripts
-git add ./scripts
+# working with git
+
+git pull     # will pull the latest changes.
+git fetch    # will update the list of changes.
+git status   # will check the status of the repo. Without the fetch first, you will not see remote changes.
+
+git status
+git add ./file.txt
 git commit
-git push
