@@ -2,7 +2,7 @@
 sudo dnf install git -y
 git --version
 
-# cofigure
+# configure
 git config --global user.name "Cristian Molaro"
 git config --global user.email "cristian@molaro.be"
 git config --list
