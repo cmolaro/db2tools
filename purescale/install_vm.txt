@@ -1,3 +1,267 @@
-
+Db2 pureScale environment in a virtual environment (Linux)
+----------------------------------------------------------
 
 Ref: https://www.ibm.com/support/producthub/db2/docs/content/SSEPGG_11.5.0/com.ibm.db2.luw.qb.server.doc/doc/r0061462.html
+
+
+
+Checking pre-requisites
+-----------------------
+
+==============================================================================================
+Validating "SELinux status " ...
+   SELinux is "enabled ".
+DBT3563E  The db2prereqcheck utility determined that SELinux is enabled, which is not supported with GPFS.
+   ERROR : Requirement not matched.
+==============================================================================================
+
+Fix:
+----
+
+Open the /etc/selinux/config file and set the SELINUX mod to disabled. Reboot.
+
+==============================================================================================
+Validating "prereqSAM" ...
+DBT3613E  The db2prereqcheck utility failed to verify the prerequisites for TSA. Ensure your machine meets all the TSA installation prerequisites.
+   ERROR : Requirement not matched.
+==============================================================================================
+
+
+***********************************************************
+SERVER
+***********************************************************
+Do you want to install the DB2 pureScale Feature? [yes/no] 
+yes
+DBT3557E  The db2prereqcheck utility determined that the current platform is not supported with the DB2 pureScale Feature. 
+  Aborting the current installation ...
+  Run installation with the option "-f sysreq" parameter to force the installation.
+
+
+Fix:
+----
+
+[root@vm1 server_dec]# ./db2_install -f sysreq
+
+Results:
+--------
+
+***********************************************************
+SERVER
+***********************************************************
+Do you want to install the DB2 pureScale Feature? [yes/no] 
+yes
+DBT3557E  The db2prereqcheck utility determined that the current platform is not supported with the DB2 pureScale Feature. 
+  The force option "-f sysreq" is used to force the installation ...
+
+DB2 installation is being initialized.
+
+
+
+Installing: GPFS
+
+ERROR: DBI20105E  An error occurred while installing the following file set:
+"gpfs". Because these files were not successfully installed, functionality that
+depends on these files might not work as expected.
+
+Rolling back what has been installed
+
+Removing files for "GPFS".
+
+
+
+Check details here: https://www.ibm.com/support/pages/how-debug-reason-gpfs-install-failure-during-installation-purescale
+
+It gives:
+
+[root@vm1 server_dec]# cd ./db2/linuxamd64/gpfs/
+[root@vm1 gpfs]#  ./installGPFS -a -f -d  > /tmp/gpfs.debug.out 2>&1
+
+the error is:
+
+error: Failed dependencies:
+        /bin/ksh is needed by gpfs.base-5.0.5-0.x86_64
+        m4 is needed by gpfs.base-5.0.5-0.x86_64
++ '[' 1 -ne 0 ']'
+
+
+Fix with:
+
+yum install ksh
+
+Then, similar issue with:
+
++ rpm -i gpfs.base-5.0.5-0.x86_64.rpm
+error: Failed dependencies:
+        m4 is needed by gpfs.base-5.0.5-0.x86_64
++ '[' 1 -ne 0 ']'
+
+Fix with:
+
+yum install m4
+
+It should end OK:
+
++ /work/server_dec/db2/linuxamd64/bin/disp_msg 1 70 /work/server_dec/db2/linuxamd64/gpfs/../install/locale/en_US.iso88591/db2install.cat 'DBI1070I: Program %s completed successfully.\n' installGPFS
++ tee -a /tmp/installGPFS.log.12220
+DBI1070I  Program installGPFS completed successfully.
+
+
++ exit 0
+
+
+Now, unistall gpfs and try the db2 install again:
+
+./uninstallGPFS
+
+It should give:
+
+Uninstalling "gpfs.base"
+
+Success
+
+DBI1070I  Program uninstallGPFS completed successfully.
+
+Uninstalling "SpectrumScale_public_key.pgp"
+Success
+
+
+Proceed with the normal Db2 installation.
+
+
+Errors with TSA
+
+Installing: TSAMP
+
+ERROR: DBI20105E  An error occurred while installing the following file set:
+"tsamp". Because these files were not successfully installed, functionality
+that depends on these files might not work as expected.
+
+Rolling back what has been installed
+
+WARNING: DBI1216E  Uninstalling the IBM Tivoli System Automation for
+      Multiplatforms (SA MP) failed because the command uninstallSAM was
+      not found in the expected directory: /opt/IBM/tsamp/sam/uninst/uninstallSAM.
+
+
+To complete db2setup execution, users need to run prereqSAM to see if the system has enough rpm packages. Users may need to install TSA required rpm package(s).
+
+Example:
+
+[root@vm1 server_dec]# find . -name prereqSAM
+./db2/linuxamd64/tsamp/prereqSAM
+./db2/linuxamd64/bin/tsamp/prereqSAM
+[root@vm1 server_dec]# ./db2/linuxamd64/tsamp/prereqSAM
+prereqSAM: Cannot determine architecture -exit.
+
+
+Install manually:
+
+[root@vm1 tsamp]# pwd
+/work/server_dec/db2/linuxamd64/tsamp
+[root@vm1 tsamp]# ./installSAM 
+
+
+Same error
+
+
+
+OS_FLAG=`uname -a | grep -c "Ubuntu"`
+if [ "$OS_FLAG" -eq 1 ] ; then
+  OS="Linux"
+  DISTRO="Ubuntu"
+else
+  OS=`uname -s`   # distinguish "Linux" "AIX" before trying to determine platform
+fi
+
+DATE=`date`
+HOST_NAME=`hostname`
+ARCH=''
+ARCH_64=0  # indicate if this is a 64 bit architecture
+PLATFORM=''
+PKGDIR=''
+
+# English only messages:
+ENMSG_NOARCH="${SCRIPT}Cannot determine architecture -exit."
+
+
+Debug
+
++ DISTRO_PACK=
++ DISTRO_VERSION_PACK=0
++ IS_ARCH_64=0
++ LINUX_32='Linux 32-bit'
++ LINUX_64='Linux 64-bit'
++ '[' Linux = AIX ']'
+++ cat /etc/redhat-release
++ IS_VERS='CentOS Linux release 7.9.2009 (Core)'
++ '[' -n 'CentOS Linux release 7.9.2009 (Core)' ']'
+++ echo CentOS Linux release 7.9.2009 '(Core)'
+++ grep -Ec 'Red Hat Enterprise.*S|Red Hat Enterprise Linux'
++ COUNT=0
++ '[' 0 -eq 1 ']'
++ logit 'prereqSAM: Cannot determine architecture -exit.'
++ echo 'prereqSAM: Cannot determine architecture -exit.'
++ '[' 0 -eq 0 ']'
+
+Change code from:
+
+     " -f2`
+ 601                 fi
+ 602                 # Map distro name
+ 603                 case "$LINUX_DISTRO" in
+ 604                    "Red Hat Enterprise Linux"*)
+ 605                       LINUX_DISTRO="RHEL"
+ 606                       ;;
+ 607                 esac
+ 608                 echo "$LINUX_DISTRO $LINUX_VERSION `uname -p`"           
+ 609             fi
+ 610             ;;
+ 611         SunOS)
+ 612             echo "SunOS `uname -r` `uname -p`"
+ 613             ;;
+ 614     esac
+ 615 }
+ 616 
+
+
+to:
+
+     " -f2`
+ 601                 fi
+ 602                 # Map distro name
+ 603                 case "$LINUX_DISTRO" in
+ 604               #     "Red Hat Enterprise Linux"*)
+ 605                    "CentOS Linux release"*)
+ 606                       LINUX_DISTRO="RHEL"
+ 607                       ;;
+ 608                 esac
+ 609                 echo "$LINUX_DISTRO $LINUX_VERSION `uname -p`"           
+ 610             fi
+ 611             ;;
+ 612         SunOS)
+ 613             echo "SunOS `uname -r` `uname -p`"
+ 614             ;;
+ 615     esac
+ 616 }
+
+
+
+
+   else # for linux
+      IS_VERS=`cat /etc/redhat-release 2>/dev/null`
+      if [ -n "$IS_VERS" ] ; then
+         COUNT=`echo $IS_VERS | $GREP -Ec "Red Hat Enterprise.*S|Red Hat Enterprise Linux"`
+         if [ $COUNT -eq 1 ] ; then
+            DISTRO_PACK=RH
+
+
+
+RedHat 8
+
+Installing or updating DB2 SSH Utilities :.......Success
+ERROR: A missing Linux package is preventing the compilation of the IBM
+Spectrum Scale (GPFS) Portability Layer (GPL) module. The required packages for
+this compilation include the following: "gcc, patch, binutils, cpp, gcc-c++,
+and kernel-devel". Ensure the packages are installed and re-run the DB2
+installer.
+
