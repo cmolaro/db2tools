@@ -1,0 +1,13 @@
+sla71147:/etc/init.d # ./db2g status
+DB2 instance db2bnlg1 is not running
+sla71147:/etc/init.d # ./db2g start
+Starting IBM DB2 instance [db2bnlg1]                       [  OK  ]
+sla71147:/etc/init.d # ./db2g status
+DB2 instance db2bnlg1 is running
+sla71147:/etc/init.d # ./db2g stop
+Stopping IBM DB2 instance [db2bnlg1]                       [  OK  ]
+sla71147:/etc/init.d # ./db2g status
+DB2 instance db2bnlg1 is not running
+sla71147:/etc/init.d # ./db2g start
+Starting IBM DB2 instance [db2bnlg1]                       [  OK  ]
+sla71147:/etc/init.d #
