@@ -1,0 +1,282 @@
+typeset -l gIs2CommonLibraryLoaded="yes"
+typeset -l gVerbose="off"
+
+typeset    gMessage="Please fill in an indicating message by filling \${gMessage}"
+typeset -i gErrorNo=99
+typeset    gIndicator="\|"
+
+typeset    gValue=""
+typeset -i gRepetition=1
+
+typeset    gQuestion=""
+typeset    gConstraint=""
+typeset    gOptionList=""
+typeset    gDefault=""
+
+#
+# Variables not meant for the other world
+#
+
+  #
+  # printfRepeatChar
+  #   Purpose: repeat a single character 'n' times
+  #   Accepts:
+  #     - ${gValue}
+  #     - ${gRepetition}
+  #   Returns:
+  #     * Return code = 0
+  #
+  function printfRepeatChar {
+
+    if [ $# -eq 2 ] ; then
+      gValue="${1}"
+      gRepetition=${2}
+    fi
+
+    typeset    lChar="${gValue:0:1}"
+    typeset -i lRepetition=${gRepetition}
+
+    [[ ${lRepetition} -eq 0 ]] && lRepetition=1
+
+    typeset lLocalString=$( printf "%-${lRepetition}s" "${lChar}" )
+    echo "${lLocalString// /${lChar}}"
+
+    set +x
+    return 0
+
+  }
+
+  #
+  # showIndicator
+  #   Purpose: shows a message with a progression indicator and returns to the beginning of the line
+  #   Accepts:
+  #     - ${gMessage}
+  #     - ${gIndicator}
+  #   Returns:
+  #     * Return code = 0
+  #
+  function showIndicator {
+
+    typeset lMessage="${gMessage:0:77}"
+    [[ "${lMessage}" != "${gMessage}" ]] && lMessage="${lMessage:0:74}..."
+
+    if [ "\\${gIndicator}" == "\\|" ] ; then
+      gIndicator="/"
+    elif [ "\\${gIndicator}" == "\\/" ] ; then
+      gIndicator="-"
+    elif [ "\\${gIndicator}" == "\\-" ] ; then
+      gIndicator="\\"
+    else
+      gIndicator="|"
+    fi
+
+    printf "%-1s %-78s\r" "${gIndicator}" "${lMessage}"
+
+    set +x
+    return 0
+
+  }
+
+  #
+  # showMessage
+  #   Purpose: show a message 'as is' on the screen
+  #   Accepts:
+  #     - ${gMessage}
+  #   Returns:
+  #     * Return code = 0
+  #
+  function showMessage {
+
+    printf "${gMessage}\n"
+
+    set +x
+    return 0
+
+  }
+
+  #
+  # showInfo
+  #   Purpose: shows a message on screen preceeded by 'Info -'
+  #   Accepts:
+  #     - ${gMessage}
+  #   Returns:
+  #     * Return code = 0
+  #
+  function showInfo {
+
+    gMessage=$( echo "${gMessage}" | sed 's/^Info - //g' )
+    gMessage="Info - ${gMessage}"
+    showMessage
+
+    set +x
+    return 0
+  }
+
+  #
+  # showWarning
+  #   Purpose: shows a message on screen preceeded by 'Warning -'
+  #   Accepts:
+  #     - ${gMessage}
+  #   Returns:
+  #     * Return code = 0
+  #
+  function showWarning {
+
+    gMessage=$( echo "${gMessage}" | sed 's/^Warning - //g' )
+    lMessage="Warning - ${lMessage}"
+    showMessage
+
+    set +x
+    return 0
+  }
+
+  #
+  # showError
+  #   Purpose: shows a message on screen preceeded by 'Error -' and followed by the return code
+  #   Accepts:
+  #     - ${gMessage}
+  #     - ${gErrorNo}
+  #   Returns:
+  #     * Return code = 0
+  #
+  function showError {
+
+    gMessage=$( echo "${gMessage}" | sed 's/^Error - //g' )
+    gMessage=$( printf "\nError - ${gMessage}" )
+    [[ ${gErrorNo} -ne 0 ]] && gMessage=$( printf "${gMessage}\nReturn code=${gErrorNo}\n" )
+    showMessage
+
+    set +x
+    return 0
+  }
+
+  #
+  # isNumeric
+  #   Purpose: determines whether the input is numeric or not
+  #   Accepts:
+  #     - ${gValue}
+  #   Returns:
+  #     * Return code = 0  ->  ${gValue} is a digit
+  #     * Return code = 1  ->  ${gValue} is empty
+  #     * Return code = 2  ->  ${gValue} is something else
+  #
+  function isNumeric {
+
+    typeset -i lValue=0
+    [[ "${1}" != "" ]] && gValue=${1}
+    [[ "${gValue}" == "" ]] && set +x && return 1
+    lValue=$( echo "${gValue}" | egrep "^[0-9][0-9]*+$" )
+    [[ "${lValue}" == "${gValue}" ]] && set +x && return 0 
+    set +x
+    return 2
+
+  }
+
+  #
+  # readValue
+  #   Purpose: accepts input from the user
+  #   Accepts:
+  #     - ${gQuestion}
+  #     - ${gConstraint} - is an answer MANDATORY or not (empty)
+  #     - ${gOptionList} - comma separated list of possible answers;
+  #                          only one of these will be accepted
+  #     - ${gDefault}    - the default value to set when no value is given
+  #   Returns:
+  #     * ${gValue}      - holding the answer (empty when something went wrong)
+  #     * Return code = 0  ->  response is given
+  #
+  function readValue {
+
+    typeset    lQuestion="${gQuestion}"  # Make variables known only for the function
+    typeset -u lConstraint=$( echo ${gConstraint} | tr '[a-z]' '[A-Z]' )
+    typeset    lDefault=${gDefault}
+    typeset    lOptions="${gOptionList}"
+    typeset -i lOptionList=0
+    typeset    lReturnValue
+    typeset    lInputValue=""
+
+    [[ "${1}" != "" ]] && lQuestion=${1}
+    [[ "${2}" != "" ]] && lConstraint=$( echo ${2} | tr '[a-z]' '[A-Z]' )
+    [[ "${3}" != "" ]] && lDefault=${3}
+
+    gValue=""
+
+    [[ "${lConstraint}" != "MANDATORY" ]] && lConstraint=""
+
+    if [ "${lDefault}" != "" ] ; then
+      lDefault=$( echo ${lDefault} | sed "s/\//~/g" )
+      lOptionList=$( echo ${lDefault} | grep -i ',' | wc -l )
+      lOptions=${lDefault}
+
+      if [ ${lOptionList} -ne 0 ] ; then
+        if [ "${4}" != "" ] ; then              # lDefault value and an option-list available
+          lDefault=${4}
+        else
+          lDefault=
+        fi
+      fi
+      lOptionsDisplay="${lOptions}"
+      if [ "${lDefault}" != "" -a "${lDefault}" != "${lOptions}" ] ; then
+        lOptionsDisplay=$(   echo ",${lOptions}," \
+                           | sed "s/,${lDefault},/,<${lDefault}>,/g" \
+                           | sed "s/^,//g" | sed "s/,$//g" )
+      fi
+
+      if [ "${lOptionsDisplay}" != "" ] ; then
+        lDefaultLength=$(( $( echo ${lOptionsDisplay} | sed 's/\\//g' | wc -m ) - 1 + 2 ))
+        if [ $( echo "${lQuestion}" | grep -E [[:space:]]\{${lDefaultLength}}:[[:space:]] | grep -v '^$' | wc -l ) -gt 0 ] ; then
+          lQuestion=$(   echo "${lQuestion}" \
+                       | sed -e "s/ \{${lDefaultLength},${lDefaultLength}\}:/[${lOptionsDisplay}]:/g" )
+        elif [ $( echo "${lQuestion}" | grep -E [[:space:]]\{${lDefaultLength}}[?][[:space:]] | grep -v '^$' | wc -l ) -gt 0 ] ; then
+          lQuestion=$(   echo "${lQuestion}" \
+                       | sed -e "s/ \{${lDefaultLength},${lDefaultLength}\}[?]/[${lOptionsDisplay}]?/g" )
+        else
+          lQuestion=$(   echo "${lQuestion}" \
+                       | sed "s/[ ]*:[ ]*$/ [${lOptionsDisplay}]: /g" \
+                       | sed "s/[ ]*?[ ]*$/ [${lOptionsDisplay}]? /g" )
+        fi
+      fi
+    fi
+
+    lReturnValue=1
+    while [ ${lReturnValue} -eq 1 ]
+    do
+      lInputValue=""
+      read lInputValue?"${lQuestion}"
+      if [ "${lConstraint}" == "MANDATORY" -a "${lInputValue}" == "" ] ; then
+        if [ "${lDefault}" != "" ] ; then
+          lInputValue=$( echo ${lDefault} | sed "s/~/\//g" )
+          lReturnValue=${lInputValue}
+          break 1
+        else
+          echo "A value has to be entered."
+        fi
+      else
+        lCount=0
+        if [ ${lOptionList} -ne 0 ] ; then
+          lCount=$( echo ",${lOptions}," | grep -i ",${lInputValue}," | wc -l )
+        else
+          if [ "${lInputValue}" != "" ] ; then
+            lCount=1
+          fi
+        fi
+        # lDefault value and an option-list available
+        if [ "${lInputValue}" == "" -a "${lDefault}" != "" -a ${lOptionList} -ge 0 ] ; then
+          lInputValue=$( echo "${lDefault}" | sed "s/~/\//g" )
+          lCount=1
+        fi
+        if [ ${lCount} -eq 0 -a "${lInputValue}" == "" -a "${lConstraint}" != "MANDATORY" ] ; then
+          lCount=1
+        fi
+        if [ ${lCount} -gt 0 ] ; then
+          lReturnValue=${lInputValue}
+          break 1
+        fi
+      fi
+    done
+    gValue=${lReturnValue}
+    set +x
+    return 0
+
+  }
+
